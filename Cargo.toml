@@ -2,10 +2,16 @@
 name = "nquads-syntax"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Timothée Haudebourg <author@haudebourg.net>"]
+description = "RDF 1.1 N-Quads parser with code mapping metadata"
+categories = ["parsing"]
+keywords = ["parsing", "rdf", "n-quads", "w3c"]
+repository = "https://github.com/timothee-haudebourg/nquads-syntax"
+documentation = "https://docs.rs/nquads-syntax"
+license = "MIT/Apache-2.0"
+readme = "README.md"
 
 [dependencies]
-iref = "*"
+iref = "2.1"
 locspan = "0.2.3"
-langtag = "*"
+langtag = "0.2"

@@ -1,10 +1,31 @@
+use std::fmt;
 use crate::lexing::{Token, Tokens};
 use iref::IriRefBuf;
 use locspan::{Loc, MapLocErr};
 
+#[derive(Debug)]
 pub enum Error<E> {
 	Lexer(E),
 	Unexpected(Option<Token>),
+}
+
+impl<E: fmt::Display> fmt::Display for Error<E> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			Self::Unexpected(None) => write!(f, "unexpected end of file"),
+			Self::Unexpected(Some(token)) => write!(f, "unexpected {}", token),
+			Self::Lexer(e) => e.fmt(f)
+		}
+	}
+}
+
+impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
+	fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+		match self {
+			Self::Lexer(e) => Some(e),
+			_ => None
+		}
+	}
 }
 
 pub trait Parsable<F>: Sized {
@@ -38,22 +59,27 @@ fn parse_literal<F: Clone, L: Tokens<F>>(
 	string_loc: locspan::Location<F>,
 ) -> Result<Loc<crate::Literal<F>, F>, Loc<Error<L::Error>, F>> {
 	match lexer.peek().map_loc_err(Error::Lexer)? {
+		Loc(Some(Token::LangTag(_)), tag_loc) => {
+			let tag = match lexer.next().map_loc_err(Error::Lexer)? {
+				Loc(Some(Token::LangTag(tag)), _) => tag,
+				_ => panic!("expected lang tag")
+			};
+
+			let mut loc = string_loc.clone();
+			loc.span_mut().append(tag_loc.span());
+			Ok(Loc(
+				crate::Literal::LangString(Loc(string, string_loc), Loc(tag, tag_loc)),
+				loc,
+			))
+		}
 		Loc(Some(Token::Carets), _) => {
 			lexer.next().map_loc_err(Error::Lexer)?;
 			match lexer.next().map_loc_err(Error::Lexer)? {
-				Loc(Some(Token::LangTag(tag)), tag_loc) => {
-					let mut loc = string_loc.clone();
-					loc.span_mut().append(tag_loc.span());
-					Ok(Loc(
-						crate::Literal::LangString(Loc(string, string_loc), Loc(tag, tag_loc)),
-						loc,
-					))
-				}
 				Loc(Some(Token::IriRef(iri_ref)), iri_ref_loc) => {
 					let mut loc = string_loc.clone();
 					loc.span_mut().append(iri_ref_loc.span());
 					Ok(Loc(
-						crate::Literal::Typed(Loc(string, string_loc), Loc(iri_ref, iri_ref_loc)),
+						crate::Literal::TypedString(Loc(string, string_loc), Loc(iri_ref, iri_ref_loc)),
 						loc,
 					))
 				}

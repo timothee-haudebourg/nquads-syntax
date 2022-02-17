@@ -4,23 +4,27 @@ use locspan::{Loc, Location, Span};
 use std::fmt;
 use std::iter::Peekable;
 
+/// Decoded character, with its encoded byte length.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub struct EncodedChar {
+pub struct DecodedChar {
 	c: char,
 	len: usize,
 }
 
-impl EncodedChar {
+impl DecodedChar {
+	/// Creates a new decoded character.
 	#[inline(always)]
-	pub fn new(c: char, len: usize) -> EncodedChar {
+	pub fn new(c: char, len: usize) -> DecodedChar {
 		Self { c, len }
 	}
 
+	/// Unwraps and returns the character.
 	#[inline(always)]
 	pub fn unwrap(self) -> char {
 		self.c
 	}
 
+	/// Returns the original encoded byte length of the character.
 	#[inline(always)]
 	#[allow(clippy::len_without_is_empty)]
 	pub fn len(&self) -> usize {
@@ -28,13 +32,13 @@ impl EncodedChar {
 	}
 }
 
-impl From<EncodedChar> for char {
-	fn from(e: EncodedChar) -> Self {
+impl From<DecodedChar> for char {
+	fn from(e: DecodedChar) -> Self {
 		e.c
 	}
 }
 
-impl std::ops::Deref for EncodedChar {
+impl std::ops::Deref for DecodedChar {
 	type Target = char;
 
 	fn deref(&self) -> &char {
@@ -42,6 +46,7 @@ impl std::ops::Deref for EncodedChar {
 	}
 }
 
+/// Stream of token, with lookahead.
 pub trait Tokens<F> {
 	type Error: fmt::Debug;
 
@@ -62,6 +67,31 @@ pub enum Error<E> {
 	Stream(E),
 }
 
+impl<E: fmt::Display> fmt::Display for Error<E> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			Self::InvalidLangTag => write!(f, "invalid language tag"),
+			Self::InvalidCodepoint(c) => write!(f, "invalid character code point {:x}", c),
+			Self::InvalidIriRef(e, iri_ref) => write!(f, "invalid IRI reference <{}>: {}", iri_ref, e),
+			Self::Unexpected(None) => write!(f, "unexpected end of file"),
+			Self::Unexpected(Some(c)) => write!(f, "unexpected character `{}`", c),
+			Self::Stream(e) => e.fmt(f)
+		}
+	}
+}
+
+impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
+	fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+		match self {
+			Self::InvalidIriRef(e, _) => Some(e),
+			Self::Stream(e) => Some(e),
+			_ => None
+		}
+	}
+}
+
+/// Token.
+#[derive(Debug)]
 pub enum Token {
 	LangTag(LanguageTagBuf),
 	IriRef(IriRefBuf),
@@ -69,6 +99,41 @@ pub enum Token {
 	BlankNodeLabel(String),
 	Dot,
 	Carets,
+}
+
+impl fmt::Display for Token {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			Self::LangTag(tag) => write!(f, "language tag `{}`", tag),
+			Self::IriRef(iri_ref) => write!(f, "IRI reference <{}>", iri_ref),
+			Self::StringLiteral(string) => write!(f, "string literal \"{}\"", DisplayStringLiteral(string)),
+			Self::BlankNodeLabel(label) => write!(f, "blank node label `{}`", label),
+			Self::Dot => write!(f, "dot `.`"),
+			Self::Carets => write!(f, "carets `^^`")
+		}
+	}
+}
+
+/// Wrapper to display string literals.
+pub struct DisplayStringLiteral<'a>(pub &'a str);
+
+impl<'a> fmt::Display for DisplayStringLiteral<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		for c in self.0.chars() {
+			match c {
+				'"' => write!(f, "\\u0022"),
+				'\\' => write!(f, "\\u005c"),
+				'\n' => write!(f, "\\n"),
+				'\r' => write!(f, "\\r"),
+				'\t' => write!(f, "\\t"),
+				'\u{08}' => write!(f, "\\b"),
+				'\u{0c}' => write!(f, "\\f"),
+				c => c.fmt(f)
+			}?
+		}
+
+		Ok(())
+	}
 }
 
 /// Lexer position.
@@ -103,13 +168,13 @@ impl<F: Clone> Position<F> {
 /// Lexer.
 ///
 /// Changes a character iterator into a `Token` iterator.
-pub struct Lexer<F, E, C: Iterator<Item = Result<EncodedChar, E>>> {
+pub struct Lexer<F, E, C: Iterator<Item = Result<DecodedChar, E>>> {
 	chars: Peekable<C>,
 	pos: Position<F>,
 	lookahead: Option<Loc<Token, F>>,
 }
 
-impl<F, E, C: Iterator<Item = Result<EncodedChar, E>>> Lexer<F, E, C> {
+impl<F, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 	pub fn new(file: F, chars: Peekable<C>) -> Self {
 		Self {
 			chars,
@@ -123,7 +188,7 @@ impl<F, E, C: Iterator<Item = Result<EncodedChar, E>>> Lexer<F, E, C> {
 	}
 }
 
-impl<F: Clone, E, C: Iterator<Item = Result<EncodedChar, E>>> Lexer<F, E, C> {
+impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 	fn peek_char(&mut self) -> Result<Option<char>, Loc<Error<E>, F>> {
 		match self.chars.peek() {
 			None => Ok(None),
@@ -304,7 +369,11 @@ impl<F: Clone, E, C: Iterator<Item = Result<EncodedChar, E>>> Lexer<F, E, C> {
 						Some('t') => '\t',
 						Some('b') => '\u{08}',
 						Some('n') => '\n',
+						Some('r') => '\r',
 						Some('f') => '\u{0c}',
+						Some('\'') => '\'',
+						Some('"') => '"',
+						Some('\\') => '\\',
 						unexpected => {
 							return Err(Loc(Error::Unexpected(unexpected), self.pos.last()))
 						}
@@ -313,7 +382,7 @@ impl<F: Clone, E, C: Iterator<Item = Result<EncodedChar, E>>> Lexer<F, E, C> {
 					string.push(c)
 				}
 				Some(c) => {
-					if matches!(c, '"' | '\\' | '\n' | '\r') {
+					if matches!(c, '\n' | '\r') {
 						return Err(Loc(Error::Unexpected(Some(c)), self.pos.last()));
 					}
 
@@ -331,8 +400,11 @@ impl<F: Clone, E, C: Iterator<Item = Result<EncodedChar, E>>> Lexer<F, E, C> {
 		match self.next_char()? {
 			Some(':') => {
 				let mut label = String::new();
+				label.push('_');
+				label.push(':');
 				match self.next_char()? {
 					Some(c) if c.is_ascii_digit() || is_pn_chars_u(c) => {
+						label.push(c);
 						let mut last_is_pn_chars = true;
 						loop {
 							match self.peek_char()? {
@@ -404,7 +476,7 @@ impl<F: Clone, E, C: Iterator<Item = Result<EncodedChar, E>>> Lexer<F, E, C> {
 	}
 }
 
-impl<F: Clone, E: fmt::Debug, C: Iterator<Item = Result<EncodedChar, E>>> Tokens<F>
+impl<F: Clone, E: fmt::Debug, C: Iterator<Item = Result<DecodedChar, E>>> Tokens<F>
 	for Lexer<F, E, C>
 {
 	type Error = Error<E>;
