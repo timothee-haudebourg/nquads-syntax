@@ -1,7 +1,7 @@
-use std::fmt;
 use crate::lexing::{Token, Tokens};
 use iref::IriRefBuf;
 use locspan::{Loc, MapLocErr};
+use std::fmt;
 
 #[derive(Debug)]
 pub enum Error<E> {
@@ -14,7 +14,7 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
 		match self {
 			Self::Unexpected(None) => write!(f, "unexpected end of file"),
 			Self::Unexpected(Some(token)) => write!(f, "unexpected {}", token),
-			Self::Lexer(e) => e.fmt(f)
+			Self::Lexer(e) => e.fmt(f),
 		}
 	}
 }
@@ -23,7 +23,7 @@ impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
 	fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
 		match self {
 			Self::Lexer(e) => Some(e),
-			_ => None
+			_ => None,
 		}
 	}
 }
@@ -62,7 +62,7 @@ fn parse_literal<F: Clone, L: Tokens<F>>(
 		Loc(Some(Token::LangTag(_)), tag_loc) => {
 			let tag = match lexer.next().map_loc_err(Error::Lexer)? {
 				Loc(Some(Token::LangTag(tag)), _) => tag,
-				_ => panic!("expected lang tag")
+				_ => panic!("expected lang tag"),
 			};
 
 			let mut loc = string_loc.clone();
@@ -79,7 +79,10 @@ fn parse_literal<F: Clone, L: Tokens<F>>(
 					let mut loc = string_loc.clone();
 					loc.span_mut().append(iri_ref_loc.span());
 					Ok(Loc(
-						crate::Literal::TypedString(Loc(string, string_loc), Loc(iri_ref, iri_ref_loc)),
+						crate::Literal::TypedString(
+							Loc(string, string_loc),
+							Loc(iri_ref, iri_ref_loc),
+						),
 						loc,
 					))
 				}

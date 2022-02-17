@@ -9,7 +9,9 @@ use std::iter::Peekable;
 pub struct Utf8Decoded<C>(C);
 
 impl<C> Utf8Decoded<C> {
-	pub fn new(chars: C) -> Self { Self(chars) }
+	pub fn new(chars: C) -> Self {
+		Self(chars)
+	}
 }
 
 impl<E, C: Iterator<Item = Result<char, E>>> Iterator for Utf8Decoded<C> {
@@ -90,10 +92,12 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
 		match self {
 			Self::InvalidLangTag => write!(f, "invalid language tag"),
 			Self::InvalidCodepoint(c) => write!(f, "invalid character code point {:x}", c),
-			Self::InvalidIriRef(e, iri_ref) => write!(f, "invalid IRI reference <{}>: {}", iri_ref, e),
+			Self::InvalidIriRef(e, iri_ref) => {
+				write!(f, "invalid IRI reference <{}>: {}", iri_ref, e)
+			}
 			Self::Unexpected(None) => write!(f, "unexpected end of file"),
 			Self::Unexpected(Some(c)) => write!(f, "unexpected character `{}`", c),
-			Self::Stream(e) => e.fmt(f)
+			Self::Stream(e) => e.fmt(f),
 		}
 	}
 }
@@ -103,7 +107,7 @@ impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
 		match self {
 			Self::InvalidIriRef(e, _) => Some(e),
 			Self::Stream(e) => Some(e),
-			_ => None
+			_ => None,
 		}
 	}
 }
@@ -124,10 +128,12 @@ impl fmt::Display for Token {
 		match self {
 			Self::LangTag(tag) => write!(f, "language tag `{}`", tag),
 			Self::IriRef(iri_ref) => write!(f, "IRI reference <{}>", iri_ref),
-			Self::StringLiteral(string) => write!(f, "string literal \"{}\"", DisplayStringLiteral(string)),
+			Self::StringLiteral(string) => {
+				write!(f, "string literal \"{}\"", DisplayStringLiteral(string))
+			}
 			Self::BlankNodeLabel(label) => write!(f, "blank node label `{}`", label),
 			Self::Dot => write!(f, "dot `.`"),
-			Self::Carets => write!(f, "carets `^^`")
+			Self::Carets => write!(f, "carets `^^`"),
 		}
 	}
 }
@@ -146,7 +152,7 @@ impl<'a> fmt::Display for DisplayStringLiteral<'a> {
 				'\t' => write!(f, "\\t"),
 				'\u{08}' => write!(f, "\\b"),
 				'\u{0c}' => write!(f, "\\f"),
-				c => c.fmt(f)
+				c => c.fmt(f),
 			}?
 		}
 
