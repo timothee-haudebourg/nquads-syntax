@@ -4,6 +4,24 @@ use locspan::{Loc, Location, Span};
 use std::fmt;
 use std::iter::Peekable;
 
+/// Changes a `char` iterator into a `DecodedChar` iterator using each character
+/// UTF-8 encoded length.
+pub struct Utf8Decoded<C>(C);
+
+impl<C> Utf8Decoded<C> {
+	pub fn new(chars: C) -> Self { Self(chars) }
+}
+
+impl<E, C: Iterator<Item = Result<char, E>>> Iterator for Utf8Decoded<C> {
+	type Item = Result<DecodedChar, E>;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		self.0
+			.next()
+			.map(|r| r.map(|c| DecodedChar::new(c, c.len_utf8())))
+	}
+}
+
 /// Decoded character, with its encoded byte length.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct DecodedChar {
