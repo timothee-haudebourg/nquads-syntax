@@ -51,3 +51,27 @@ pub struct Quad<F> {
 pub struct Document<F> {
 	pub quads: Vec<Loc<Quad<F>, F>>,
 }
+
+impl<F> Document<F> {
+	pub fn iter(&self) -> std::slice::Iter<Loc<Quad<F>, F>> {
+		self.quads.iter()
+	}
+}
+
+impl<'a, F> IntoIterator for &'a Document<F> {
+	type Item = &'a Loc<Quad<F>, F>;
+	type IntoIter = std::slice::Iter<'a, Loc<Quad<F>, F>>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.quads.iter()
+	}
+}
+
+impl<F> IntoIterator for Document<F> {
+	type Item = Loc<Quad<F>, F>;
+	type IntoIter = std::vec::IntoIter<Loc<Quad<F>, F>>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.quads.into_iter()
+	}
+}
