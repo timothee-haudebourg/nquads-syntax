@@ -3,7 +3,9 @@ use langtag::LanguageTagBuf;
 use locspan::Loc;
 
 pub mod lexing;
-mod parsing;
+pub mod parsing;
+
+pub use parsing::Parse;
 
 /// Subject.
 #[derive(Clone, Debug)]

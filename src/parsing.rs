@@ -28,12 +28,12 @@ impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
 	}
 }
 
-pub trait Parsable<F>: Sized {
+pub trait Parse<F>: Sized {
 	#[allow(clippy::type_complexity)]
 	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>>;
 }
 
-impl<F: Clone> Parsable<F> for IriRefBuf {
+impl<F: Clone> Parse<F> for IriRefBuf {
 	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
 		match lexer.next().map_loc_err(Error::Lexer)? {
 			Loc(Some(Token::IriRef(iri_ref)), loc) => Ok(Loc(iri_ref, loc)),
@@ -42,7 +42,7 @@ impl<F: Clone> Parsable<F> for IriRefBuf {
 	}
 }
 
-impl<F: Clone> Parsable<F> for crate::Subject {
+impl<F: Clone> Parse<F> for crate::Subject {
 	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
 		match lexer.next().map_loc_err(Error::Lexer)? {
 			Loc(Some(Token::IriRef(iri_ref)), loc) => Ok(Loc(Self::IriRef(iri_ref), loc)),
@@ -96,7 +96,7 @@ fn parse_literal<F: Clone, L: Tokens<F>>(
 	}
 }
 
-impl<F: Clone> Parsable<F> for crate::Literal<F> {
+impl<F: Clone> Parse<F> for crate::Literal<F> {
 	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
 		match lexer.next().map_loc_err(Error::Lexer)? {
 			Loc(Some(Token::StringLiteral(string)), string_loc) => {
@@ -107,7 +107,7 @@ impl<F: Clone> Parsable<F> for crate::Literal<F> {
 	}
 }
 
-impl<F: Clone> Parsable<F> for crate::Object<F> {
+impl<F: Clone> Parse<F> for crate::Object<F> {
 	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
 		match lexer.next().map_loc_err(Error::Lexer)? {
 			Loc(Some(Token::IriRef(iri_ref)), loc) => Ok(Loc(Self::IriRef(iri_ref), loc)),
@@ -121,7 +121,7 @@ impl<F: Clone> Parsable<F> for crate::Object<F> {
 	}
 }
 
-impl<F: Clone> Parsable<F> for crate::GraphLabel {
+impl<F: Clone> Parse<F> for crate::GraphLabel {
 	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
 		Self::from_opt_token(lexer.next().map_loc_err(Error::Lexer)?)
 	}
@@ -139,7 +139,7 @@ impl crate::GraphLabel {
 	}
 }
 
-impl<F: Clone> Parsable<F> for crate::Quad<F> {
+impl<F: Clone> Parse<F> for crate::Quad<F> {
 	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
 		let subject = crate::Subject::parse(lexer)?;
 		let predicate = IriRefBuf::parse(lexer)?;
@@ -168,7 +168,7 @@ impl<F: Clone> Parsable<F> for crate::Quad<F> {
 	}
 }
 
-impl<F: Clone> Parsable<F> for crate::Document<F> {
+impl<F: Clone> Parse<F> for crate::Document<F> {
 	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
 		let mut quads = Vec::new();
 		let mut loc: Option<locspan::Location<F>> = None;
