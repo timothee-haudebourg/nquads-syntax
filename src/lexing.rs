@@ -3,6 +3,10 @@ use langtag::LanguageTagBuf;
 use locspan::{Loc, Location, Span};
 use std::fmt;
 use std::iter::Peekable;
+use super::{
+	StringLiteral,
+	BlankIdBuf
+};
 
 /// Changes a `char` iterator into a `DecodedChar` iterator using each character
 /// UTF-8 encoded length.
@@ -117,8 +121,8 @@ impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
 pub enum Token {
 	LangTag(LanguageTagBuf),
 	IriRef(IriRefBuf),
-	StringLiteral(String),
-	BlankNodeLabel(String),
+	StringLiteral(StringLiteral),
+	BlankNodeLabel(BlankIdBuf),
 	Dot,
 	Carets,
 }
@@ -379,7 +383,7 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 	}
 
 	/// Parses a string literal, starting after the first `"` until the closing `"`.
-	fn next_string_literal(&mut self) -> Result<Loc<String, F>, Loc<Error<E>, F>> {
+	fn next_string_literal(&mut self) -> Result<Loc<StringLiteral, F>, Loc<Error<E>, F>> {
 		let mut string = String::new();
 
 		loop {
@@ -416,11 +420,11 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 			}
 		}
 
-		Ok(Loc(string, self.pos.current()))
+		Ok(Loc(string.into(), self.pos.current()))
 	}
 
 	/// Parses a blank node label, starting after the first `_`.
-	fn next_blank_node_label(&mut self) -> Result<Loc<String, F>, Loc<Error<E>, F>> {
+	fn next_blank_node_label(&mut self) -> Result<Loc<BlankIdBuf, F>, Loc<Error<E>, F>> {
 		match self.next_char()? {
 			Some(':') => {
 				let mut label = String::new();
@@ -447,7 +451,7 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 							}
 						}
 
-						Ok(Loc(label, self.pos.current()))
+						Ok(Loc(unsafe { BlankIdBuf::new_unchecked(label) }, self.pos.current()))
 					}
 					unexpected => Err(Loc(Error::Unexpected(unexpected), self.pos.last())),
 				}

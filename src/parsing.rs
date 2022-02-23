@@ -1,4 +1,7 @@
-use crate::lexing::{Token, Tokens};
+use crate::{
+	lexing::{Token, Tokens},
+	StringLiteral
+};
 use iref::IriRefBuf;
 use locspan::{Loc, MapLocErr};
 use std::fmt;
@@ -55,7 +58,7 @@ impl<F: Clone> Parse<F> for crate::Subject {
 #[allow(clippy::type_complexity)]
 fn parse_literal<F: Clone, L: Tokens<F>>(
 	lexer: &mut L,
-	string: String,
+	string: StringLiteral,
 	string_loc: locspan::Location<F>,
 ) -> Result<Loc<crate::Literal<F>, F>, Loc<Error<L::Error>, F>> {
 	match lexer.peek().map_loc_err(Error::Lexer)? {

@@ -1,32 +1,28 @@
 use iref::IriRefBuf;
-use langtag::LanguageTagBuf;
 use locspan::Loc;
 
 pub mod lexing;
 pub mod parsing;
 
 pub use parsing::Parse;
+pub use rdf_types::loc::Literal;
+pub use rdf_types::{
+	BlankIdBuf,
+	StringLiteral
+};
 
 /// Subject.
 #[derive(Clone, Debug)]
 pub enum Subject {
 	IriRef(IriRefBuf),
-	Blank(String),
-}
-
-/// Literal value.
-#[derive(Clone, Debug)]
-pub enum Literal<F> {
-	String(Loc<String, F>),
-	TypedString(Loc<String, F>, Loc<IriRefBuf, F>),
-	LangString(Loc<String, F>, Loc<LanguageTagBuf, F>),
+	Blank(BlankIdBuf),
 }
 
 /// Object.
 #[derive(Clone, Debug)]
 pub enum Object<F> {
 	IriRef(IriRefBuf),
-	Blank(String),
+	Blank(BlankIdBuf),
 	Literal(Literal<F>),
 }
 
@@ -34,7 +30,7 @@ pub enum Object<F> {
 #[derive(Clone, Debug)]
 pub enum GraphLabel {
 	IriRef(IriRefBuf),
-	Blank(String),
+	Blank(BlankIdBuf),
 }
 
 /// RDF Quad.
