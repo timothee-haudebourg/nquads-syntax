@@ -6,10 +6,7 @@ pub mod parsing;
 
 pub use parsing::Parse;
 pub use rdf_types::loc::Literal;
-pub use rdf_types::{
-	BlankIdBuf,
-	StringLiteral
-};
+pub use rdf_types::{BlankIdBuf, StringLiteral};
 
 /// Subject.
 #[derive(Clone, Debug)]

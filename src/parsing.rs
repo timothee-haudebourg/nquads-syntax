@@ -1,6 +1,6 @@
 use crate::{
 	lexing::{Token, Tokens},
-	StringLiteral
+	StringLiteral,
 };
 use iref::IriRefBuf;
 use locspan::{Loc, MapLocErr};

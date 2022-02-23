@@ -1,12 +1,9 @@
+use super::{BlankIdBuf, StringLiteral};
 use iref::IriRefBuf;
 use langtag::LanguageTagBuf;
 use locspan::{Loc, Location, Span};
 use std::fmt;
 use std::iter::Peekable;
-use super::{
-	StringLiteral,
-	BlankIdBuf
-};
 
 /// Changes a `char` iterator into a `DecodedChar` iterator using each character
 /// UTF-8 encoded length.
@@ -451,7 +448,10 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 							}
 						}
 
-						Ok(Loc(unsafe { BlankIdBuf::new_unchecked(label) }, self.pos.current()))
+						Ok(Loc(
+							unsafe { BlankIdBuf::new_unchecked(label) },
+							self.pos.current(),
+						))
 					}
 					unexpected => Err(Loc(Error::Unexpected(unexpected), self.pos.last())),
 				}
