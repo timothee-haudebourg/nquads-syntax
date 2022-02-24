@@ -12,7 +12,7 @@ license = "MIT/Apache-2.0"
 readme = "README.md"
 
 [dependencies]
-iref = "2.1"
+iref = "2.1.1"
 locspan = "0.2.3"
 langtag = "0.2"
-rdf-types = { version = "0.1.2", features = ["loc"] }
+rdf-types = { version = "0.2.1", features = ["loc"] }

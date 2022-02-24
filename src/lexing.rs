@@ -1,5 +1,5 @@
 use super::{BlankIdBuf, StringLiteral};
-use iref::IriRefBuf;
+use iref::IriBuf;
 use langtag::LanguageTagBuf;
 use locspan::{Loc, Location, Span};
 use std::fmt;
@@ -117,7 +117,7 @@ impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
 #[derive(Debug)]
 pub enum Token {
 	LangTag(LanguageTagBuf),
-	IriRef(IriRefBuf),
+	Iri(IriBuf),
 	StringLiteral(StringLiteral),
 	BlankNodeLabel(BlankIdBuf),
 	Dot,
@@ -128,7 +128,7 @@ impl fmt::Display for Token {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Self::LangTag(tag) => write!(f, "language tag `{}`", tag),
-			Self::IriRef(iri_ref) => write!(f, "IRI reference <{}>", iri_ref),
+			Self::Iri(iri) => write!(f, "IRI <{}>", iri),
 			Self::StringLiteral(string) => {
 				write!(f, "string literal \"{}\"", DisplayStringLiteral(string))
 			}
@@ -319,9 +319,9 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 		}
 	}
 
-	/// Parses an IRI reference, starting after the first `<` until the closing `>`.
-	fn next_iriref(&mut self) -> Result<Loc<IriRefBuf, F>, Loc<Error<E>, F>> {
-		let mut iriref = String::new();
+	/// Parses an IRI, starting after the first `<` until the closing `>`.
+	fn next_iri(&mut self) -> Result<Loc<IriBuf, F>, Loc<Error<E>, F>> {
+		let mut iri = String::new();
 
 		loop {
 			match self.next_char()? {
@@ -336,7 +336,7 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 						}
 					};
 
-					iriref.push(c)
+					iri.push(c)
 				}
 				Some(c) => {
 					if matches!(
@@ -346,14 +346,14 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 						return Err(Loc(Error::Unexpected(Some(c)), self.pos.last()));
 					}
 
-					iriref.push(c)
+					iri.push(c)
 				}
 				None => return Err(Loc(Error::Unexpected(None), self.pos.end())),
 			}
 		}
 
-		match IriRefBuf::from_string(iriref) {
-			Ok(iriref) => Ok(Loc(iriref, self.pos.current())),
+		match IriBuf::from_string(iri) {
+			Ok(iri) => Ok(Loc(iri, self.pos.current())),
 			Err((e, string)) => Err(Loc(Error::InvalidIriRef(e, string), self.pos.current())),
 		}
 	}
@@ -464,7 +464,7 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 		self.skip_whitespaces()?;
 		match self.next_char()? {
 			Some('@') => Ok(self.next_langtag()?.map(|t| Some(Token::LangTag(t)))),
-			Some('<') => Ok(self.next_iriref()?.map(|t| Some(Token::IriRef(t)))),
+			Some('<') => Ok(self.next_iri()?.map(|t| Some(Token::Iri(t)))),
 			Some('"') => Ok(self
 				.next_string_literal()?
 				.map(|t| Some(Token::StringLiteral(t)))),
