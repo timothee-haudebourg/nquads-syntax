@@ -1,0 +1,2 @@
+_:subject _:predicate _:object .
+_:subject _:predicate _:object _:graph .

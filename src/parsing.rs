@@ -156,7 +156,73 @@ impl<F: Clone> Parse<F>
 	}
 }
 
+impl<F: Clone> Parse<F>
+	for crate::Quad<
+		Loc<crate::Term<F>, F>,
+		Loc<crate::Term<F>, F>,
+		Loc<crate::Term<F>, F>,
+		Loc<crate::Term<F>, F>,
+	>
+{
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
+		let subject = crate::Term::parse(lexer)?;
+		let predicate = crate::Term::parse(lexer)?;
+		let object = crate::Term::parse(lexer)?;
+		let (graph, loc) = match lexer.next().map_loc_err(Error::Lexer)? {
+			Loc(Some(Token::Dot), _) => (None, subject.location().clone().with(object.span())),
+			opt_token => {
+				let graph_label = match opt_token {
+					Loc(Some(Token::Iri(iri)), loc) => Loc(crate::Term::Iri(iri), loc),
+					Loc(Some(Token::BlankNodeLabel(label)), loc) => {
+						Loc(crate::Term::Blank(label), loc)
+					}
+					Loc(Some(Token::StringLiteral(string)), string_loc) => {
+						let Loc(lit, lit_loc) = parse_literal(lexer, string, string_loc)?;
+						Loc(crate::Term::Literal(lit), lit_loc)
+					},
+					Loc(unexpected, loc) => return Err(Loc(Error::Unexpected(unexpected), loc)),
+				};
+
+				let loc = subject.location().clone().with(graph_label.span());
+				match lexer.next().map_loc_err(Error::Lexer)? {
+					Loc(Some(Token::Dot), _) => (Some(graph_label), loc),
+					Loc(unexpected, loc) => return Err(Loc(Error::Unexpected(unexpected), loc)),
+				}
+			}
+		};
+
+		Ok(Loc(crate::Quad(subject, predicate, object, graph), loc))
+	}
+}
+
 impl<F: Clone> Parse<F> for crate::Document<F> {
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
+		let mut quads = Vec::new();
+		let mut loc: Option<locspan::Location<F>> = None;
+
+		let loc = loop {
+			match lexer.peek().map_loc_err(Error::Lexer)? {
+				Loc(Some(_), quad_loc) => {
+					quads.push(crate::Quad::parse(lexer)?);
+					loc = match loc {
+						Some(loc) => Some(loc.with(quad_loc.span())),
+						None => Some(quad_loc),
+					};
+				}
+				Loc(None, end_loc) => {
+					break match loc {
+						Some(loc) => loc,
+						None => end_loc,
+					}
+				}
+			}
+		};
+
+		Ok(Loc(quads, loc))
+	}
+}
+
+impl<F: Clone> Parse<F> for crate::GrdfDocument<F> {
 	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
 		let mut quads = Vec::new();
 		let mut loc: Option<locspan::Location<F>> = None;
