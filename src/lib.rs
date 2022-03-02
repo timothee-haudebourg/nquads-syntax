@@ -14,7 +14,8 @@ pub type LocQuad<F> =
 	Loc<Quad<Loc<Subject, F>, Loc<IriBuf, F>, Loc<Object<F>, F>, Loc<GraphLabel, F>>, F>;
 
 /// Located gRDF quad.
-pub type LocGrdfQuad<F> = Loc<Quad<Loc<Term<F>, F>, Loc<Term<F>, F>, Loc<Term<F>, F>, Loc<Term<F>, F>>, F>;
+pub type LocGrdfQuad<F> =
+	Loc<Quad<Loc<Term<F>, F>, Loc<Term<F>, F>, Loc<Term<F>, F>, Loc<Term<F>, F>>, F>;
 
 /// N-Quads document.
 pub type Document<F> = Vec<LocQuad<F>>;

@@ -179,7 +179,7 @@ impl<F: Clone> Parse<F>
 					Loc(Some(Token::StringLiteral(string)), string_loc) => {
 						let Loc(lit, lit_loc) = parse_literal(lexer, string, string_loc)?;
 						Loc(crate::Term::Literal(lit), lit_loc)
-					},
+					}
 					Loc(unexpected, loc) => return Err(Loc(Error::Unexpected(unexpected), loc)),
 				};
 
