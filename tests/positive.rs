@@ -1,8 +1,10 @@
 use locspan::Loc;
-use std::path::Path;
 use nquads_syntax::Parse;
+use std::path::Path;
 
-fn infallible(c: char) -> Result<char, std::convert::Infallible> { Ok(c) }
+fn infallible(c: char) -> Result<char, std::convert::Infallible> {
+	Ok(c)
+}
 
 fn parse<P: AsRef<Path>>(path: P) {
 	stderrlog::new().init().ok();
@@ -29,10 +31,16 @@ fn parse<P: AsRef<Path>>(path: P) {
 }
 
 #[test]
-fn p01() { parse("tests/positive/01.nq") }
+fn p01() {
+	parse("tests/positive/01.nq")
+}
 
 #[test]
-fn p02() { parse("tests/positive/02.nq") }
+fn p02() {
+	parse("tests/positive/02.nq")
+}
 
 #[test]
-fn p03() { parse("tests/positive/03.nq") }
+fn p03() {
+	parse("tests/positive/03.nq")
+}

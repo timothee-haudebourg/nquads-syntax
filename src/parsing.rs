@@ -82,10 +82,7 @@ fn parse_literal<F: Clone, L: Tokens<F>>(
 					let mut loc = string_loc.clone();
 					loc.span_mut().append(iri_loc.span());
 					Ok(Loc(
-						crate::Literal::TypedString(
-							Loc(string, string_loc),
-							Loc(iri, iri_loc),
-						),
+						crate::Literal::TypedString(Loc(string, string_loc), Loc(iri, iri_loc)),
 						loc,
 					))
 				}
@@ -124,12 +121,14 @@ impl<F: Clone> Parse<F> for crate::Object<F> {
 	}
 }
 
-impl<F: Clone> Parse<F> for crate::Quad<
-	Loc<crate::Subject, F>,
-	Loc<crate::IriBuf, F>,
-	Loc<crate::Object<F>, F>,
-	Loc<crate::GraphLabel, F>
-> {
+impl<F: Clone> Parse<F>
+	for crate::Quad<
+		Loc<crate::Subject, F>,
+		Loc<crate::IriBuf, F>,
+		Loc<crate::Object<F>, F>,
+		Loc<crate::GraphLabel, F>,
+	>
+{
 	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
 		let subject = crate::Subject::parse(lexer)?;
 		let predicate = IriBuf::parse(lexer)?;
@@ -139,7 +138,9 @@ impl<F: Clone> Parse<F> for crate::Quad<
 			opt_token => {
 				let graph_label = match opt_token {
 					Loc(Some(Token::Iri(iri)), loc) => Loc(crate::GraphLabel::Iri(iri), loc),
-					Loc(Some(Token::BlankNodeLabel(label)), loc) => Loc(crate::GraphLabel::Blank(label), loc),
+					Loc(Some(Token::BlankNodeLabel(label)), loc) => {
+						Loc(crate::GraphLabel::Blank(label), loc)
+					}
 					Loc(unexpected, loc) => return Err(Loc(Error::Unexpected(unexpected), loc)),
 				};
 
@@ -151,15 +152,7 @@ impl<F: Clone> Parse<F> for crate::Quad<
 			}
 		};
 
-		Ok(Loc(
-			crate::Quad(
-				subject,
-				predicate,
-				object,
-				graph,
-			),
-			loc,
-		))
+		Ok(Loc(crate::Quad(subject, predicate, object, graph), loc))
 	}
 }
 
