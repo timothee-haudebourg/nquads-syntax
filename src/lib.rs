@@ -4,6 +4,7 @@ use locspan::Loc;
 pub mod lexing;
 pub mod parsing;
 
+pub use lexing::Lexer;
 pub use parsing::Parse;
 pub use rdf_types::loc::{Literal, Object};
 pub use rdf_types::{Quad, Subject, GraphLabel, BlankIdBuf, StringLiteral};
