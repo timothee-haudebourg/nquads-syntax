@@ -304,13 +304,11 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 			tag.push(self.expect_char()?);
 			loop {
 				match self.peek_char()? {
-					Some('-') if !empty_subtag => {
-						tag.push(self.expect_char()?)
-					},
+					Some('-') if !empty_subtag => tag.push(self.expect_char()?),
 					Some(c) if c.is_ascii_alphanumeric() => {
 						empty_subtag = false;
 						tag.push(self.expect_char()?)
-					},
+					}
 					Some(c) => {
 						if c.is_whitespace() {
 							if empty_subtag {
