@@ -285,28 +285,49 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 				Some(c) => {
 					if c.is_ascii_alphabetic() {
 						tag.push(self.expect_char()?);
+					} else if c.is_whitespace() || c == '-' {
+						if tag.is_empty() {
+							return Err(Loc(Error::InvalidLangTag, self.pos.current()));
+						} else {
+							break;
+						}
 					} else {
+						self.next_char()?;
 						return Err(Loc(Error::Unexpected(Some(c)), self.pos.last()));
 					}
 				}
 			}
 		}
 
-		while let Some('-') = self.peek_char()? {
+		let mut empty_subtag = true;
+		if let Some('-') = self.peek_char()? {
+			tag.push(self.expect_char()?);
 			loop {
 				match self.peek_char()? {
+					Some('-') if !empty_subtag => {
+						tag.push(self.expect_char()?)
+					},
+					Some(c) if c.is_ascii_alphanumeric() => {
+						empty_subtag = false;
+						tag.push(self.expect_char()?)
+					},
+					Some(c) => {
+						if c.is_whitespace() {
+							if empty_subtag {
+								return Err(Loc(Error::InvalidLangTag, self.pos.current()));
+							} else {
+								break;
+							}
+						} else {
+							self.next_char()?;
+							return Err(Loc(Error::Unexpected(Some(c)), self.pos.last()));
+						}
+					}
 					None => {
-						if tag.is_empty() {
+						if empty_subtag {
 							return Err(Loc(Error::InvalidLangTag, self.pos.current()));
 						} else {
 							break;
-						}
-					}
-					Some(c) => {
-						if c.is_ascii_alphanumeric() {
-							tag.push(self.expect_char()?);
-						} else {
-							return Err(Loc(Error::Unexpected(Some(c)), self.pos.last()));
 						}
 					}
 				}

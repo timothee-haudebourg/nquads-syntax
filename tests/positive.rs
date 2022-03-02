@@ -44,3 +44,8 @@ fn p02() {
 fn p03() {
 	parse("tests/positive/03.nq")
 }
+
+#[test]
+fn p04() {
+	parse("tests/positive/04.nq")
+}
