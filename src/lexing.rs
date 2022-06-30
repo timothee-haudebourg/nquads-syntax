@@ -178,7 +178,7 @@ impl<F: Clone> Position<F> {
 	}
 
 	fn end(&self) -> Location<F> {
-		Location::new(self.file.clone(), self.span.end())
+		Location::new(self.file.clone(), self.span.end().into())
 	}
 
 	fn last(&self) -> Location<F> {
