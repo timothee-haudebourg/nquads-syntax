@@ -1,4 +1,4 @@
-use locspan::Loc;
+use locspan::Meta;
 use nquads_syntax::Parse;
 use std::path::Path;
 
@@ -17,7 +17,7 @@ fn parse<P: AsRef<Path>>(path: P) {
 
 			match nquads_syntax::Document::parse(&mut lexer) {
 				Ok(_) => (), // success!
-				Err(Loc(e, _)) => {
+				Err(Meta(e, _)) => {
 					log::error!("parse error: {}", e);
 					panic!("parse error: {:?}", e)
 				}

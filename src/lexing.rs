@@ -1,7 +1,7 @@
 use super::{BlankIdBuf, StringLiteral};
 use iref::IriBuf;
 use langtag::LanguageTagBuf;
-use locspan::{Loc, Location, Span};
+use locspan::{Loc, Location, Meta, Span};
 use std::fmt;
 use std::iter::Peekable;
 
@@ -503,13 +503,13 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 	#[allow(clippy::type_complexity)]
 	pub fn peek(&mut self) -> Result<Loc<Option<&Token>, F>, Loc<Error<E>, F>> {
 		if self.lookahead.is_none() {
-			if let locspan::Loc(Some(token), loc) = self.consume()? {
+			if let Meta(Some(token), loc) = self.consume()? {
 				self.lookahead = Some(Loc::new(token, loc));
 			}
 		}
 
 		match &self.lookahead {
-			Some(locspan::Loc(token, loc)) => Ok(Loc::new(Some(token), loc.clone())),
+			Some(Meta(token, loc)) => Ok(Loc::new(Some(token), loc.clone())),
 			None => Ok(Loc::new(None, self.pos.end())),
 		}
 	}
@@ -517,7 +517,7 @@ impl<F: Clone, E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<F, E, C> {
 	#[allow(clippy::type_complexity, clippy::should_implement_trait)]
 	pub fn next(&mut self) -> Result<Loc<Option<Token>, F>, Loc<Error<E>, F>> {
 		match self.lookahead.take() {
-			Some(locspan::Loc(token, loc)) => Ok(Loc::new(Some(token), loc)),
+			Some(Meta(token, loc)) => Ok(Loc::new(Some(token), loc)),
 			None => self.consume(),
 		}
 	}

@@ -1,24 +1,22 @@
 use iref::IriBuf;
-use locspan::Loc;
+use locspan::{Location, Span};
 
 pub mod lexing;
 pub mod parsing;
 
 pub use lexing::Lexer;
 pub use parsing::Parse;
-pub use rdf_types::loc::{Literal, Object, Term};
+pub use rdf_types::meta::{Literal, Object, Term};
 pub use rdf_types::{BlankIdBuf, GraphLabel, Quad, StringLiteral, Subject};
 
 /// Located quad.
-pub type LocQuad<F> =
-	Loc<Quad<Loc<Subject, F>, Loc<IriBuf, F>, Loc<Object<F>, F>, Loc<GraphLabel, F>>, F>;
+pub type LocQuad<F, S = Span> = rdf_types::meta::MetaRdfQuad<Location<F, S>>;
 
 /// Located gRDF quad.
-pub type LocGrdfQuad<F> =
-	Loc<Quad<Loc<Term<F>, F>, Loc<Term<F>, F>, Loc<Term<F>, F>, Loc<Term<F>, F>>, F>;
+pub type LocGrdfQuad<F, S = Span> = rdf_types::meta::MetaGrdfQuad<Location<F, S>>;
 
 /// N-Quads document.
-pub type Document<F> = Vec<LocQuad<F>>;
+pub type Document<F, S = Span> = Vec<LocQuad<F, S>>;
 
 /// gRDF N-Quads document.
-pub type GrdfDocument<F> = Vec<LocGrdfQuad<F>>;
+pub type GrdfDocument<F, S = Span> = Vec<LocGrdfQuad<F, S>>;
