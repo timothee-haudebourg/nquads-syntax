@@ -3,13 +3,21 @@ use crate::{
 	StringLiteral,
 };
 use iref::IriBuf;
-use locspan::{Loc, Location, MapLocErr, Meta};
+use locspan::{Loc, Location, Meta};
 use std::fmt;
 
 #[derive(Debug)]
 pub enum Error<E> {
 	Lexer(E),
 	Unexpected(Option<Token>),
+}
+
+pub type BoxedError<E, F> = Box<Loc<Error<E>, F>>;
+
+impl<E> Error<E> {
+	fn from_lexer<F>(Meta(e, loc): Loc<E, F>) -> BoxedError<E, F> {
+		Box::new(Meta(Self::Lexer(e), loc))
+	}
 }
 
 impl<E: fmt::Display> fmt::Display for Error<E> {
@@ -33,24 +41,24 @@ impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
 
 pub trait Parse<F>: Sized {
 	#[allow(clippy::type_complexity)]
-	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>>;
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, BoxedError<L::Error, F>>;
 }
 
 impl<F: Clone> Parse<F> for IriBuf {
-	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
-		match lexer.next().map_loc_err(Error::Lexer)? {
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, BoxedError<L::Error, F>> {
+		match lexer.next().map_err(Error::from_lexer)? {
 			Meta(Some(Token::Iri(iri)), loc) => Ok(Loc(iri, loc)),
-			Meta(unexpected, loc) => Err(Loc(Error::Unexpected(unexpected), loc)),
+			Meta(unexpected, loc) => Err(Box::new(Loc(Error::Unexpected(unexpected), loc))),
 		}
 	}
 }
 
 impl<F: Clone> Parse<F> for crate::Subject {
-	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
-		match lexer.next().map_loc_err(Error::Lexer)? {
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, BoxedError<L::Error, F>> {
+		match lexer.next().map_err(Error::from_lexer)? {
 			Meta(Some(Token::Iri(iri)), loc) => Ok(Loc(Self::Iri(iri), loc)),
 			Meta(Some(Token::BlankNodeLabel(label)), loc) => Ok(Loc(Self::Blank(label), loc)),
-			Meta(unexpected, loc) => Err(Loc(Error::Unexpected(unexpected), loc)),
+			Meta(unexpected, loc) => Err(Box::new(Loc(Error::Unexpected(unexpected), loc))),
 		}
 	}
 }
@@ -60,10 +68,10 @@ fn parse_literal<F: Clone, L: Tokens<F>>(
 	lexer: &mut L,
 	string: StringLiteral,
 	string_loc: Location<F>,
-) -> Result<Loc<crate::Literal<Location<F>>, F>, Loc<Error<L::Error>, F>> {
-	match lexer.peek().map_loc_err(Error::Lexer)? {
+) -> Result<Loc<crate::Literal<Location<F>>, F>, BoxedError<L::Error, F>> {
+	match lexer.peek().map_err(Error::from_lexer)? {
 		Meta(Some(Token::LangTag(_)), tag_loc) => {
-			let tag = match lexer.next().map_loc_err(Error::Lexer)? {
+			let tag = match lexer.next().map_err(Error::from_lexer)? {
 				Meta(Some(Token::LangTag(tag)), _) => tag,
 				_ => panic!("expected lang tag"),
 			};
@@ -76,8 +84,8 @@ fn parse_literal<F: Clone, L: Tokens<F>>(
 			))
 		}
 		Meta(Some(Token::Carets), _) => {
-			lexer.next().map_loc_err(Error::Lexer)?;
-			match lexer.next().map_loc_err(Error::Lexer)? {
+			lexer.next().map_err(Error::from_lexer)?;
+			match lexer.next().map_err(Error::from_lexer)? {
 				Meta(Some(Token::Iri(iri)), iri_loc) => {
 					let mut loc = string_loc.clone();
 					loc.span_mut().append(iri_loc.span());
@@ -86,7 +94,7 @@ fn parse_literal<F: Clone, L: Tokens<F>>(
 						loc,
 					))
 				}
-				Meta(unexpected, loc) => Err(Loc(Error::Unexpected(unexpected), loc)),
+				Meta(unexpected, loc) => Err(Box::new(Loc(Error::Unexpected(unexpected), loc))),
 			}
 		}
 		_ => Ok(Loc(
@@ -97,26 +105,26 @@ fn parse_literal<F: Clone, L: Tokens<F>>(
 }
 
 impl<F: Clone> Parse<F> for crate::Literal<Location<F>> {
-	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
-		match lexer.next().map_loc_err(Error::Lexer)? {
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, BoxedError<L::Error, F>> {
+		match lexer.next().map_err(Error::from_lexer)? {
 			Meta(Some(Token::StringLiteral(string)), string_loc) => {
 				parse_literal(lexer, string, string_loc)
 			}
-			Meta(unexpected, loc) => Err(Loc(Error::Unexpected(unexpected), loc)),
+			Meta(unexpected, loc) => Err(Box::new(Loc(Error::Unexpected(unexpected), loc))),
 		}
 	}
 }
 
 impl<F: Clone> Parse<F> for crate::Object<Location<F>> {
-	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
-		match lexer.next().map_loc_err(Error::Lexer)? {
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, BoxedError<L::Error, F>> {
+		match lexer.next().map_err(Error::from_lexer)? {
 			Meta(Some(Token::Iri(iri)), loc) => Ok(Loc(Self::Iri(iri), loc)),
 			Meta(Some(Token::BlankNodeLabel(label)), loc) => Ok(Loc(Self::Blank(label), loc)),
 			Meta(Some(Token::StringLiteral(string)), string_loc) => {
 				let Meta(lit, loc) = parse_literal(lexer, string, string_loc)?;
 				Ok(Loc(Self::Literal(lit), loc))
 			}
-			Meta(unexpected, loc) => Err(Loc(Error::Unexpected(unexpected), loc)),
+			Meta(unexpected, loc) => Err(Box::new(Loc(Error::Unexpected(unexpected), loc))),
 		}
 	}
 }
@@ -129,11 +137,11 @@ impl<F: Clone> Parse<F>
 		Loc<crate::GraphLabel, F>,
 	>
 {
-	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, BoxedError<L::Error, F>> {
 		let subject = crate::Subject::parse(lexer)?;
 		let predicate = IriBuf::parse(lexer)?;
 		let object = crate::Object::parse(lexer)?;
-		let (graph, loc) = match lexer.next().map_loc_err(Error::Lexer)? {
+		let (graph, loc) = match lexer.next().map_err(Error::from_lexer)? {
 			Meta(Some(Token::Dot), _) => (None, subject.location().clone().with(object.span())),
 			opt_token => {
 				let graph_label = match opt_token {
@@ -141,13 +149,13 @@ impl<F: Clone> Parse<F>
 					Meta(Some(Token::BlankNodeLabel(label)), loc) => {
 						Loc(crate::GraphLabel::Blank(label), loc)
 					}
-					Meta(unexpected, loc) => return Err(Loc(Error::Unexpected(unexpected), loc)),
+					Meta(unexpected, loc) => return Err(Box::new(Loc(Error::Unexpected(unexpected), loc))),
 				};
 
 				let loc = subject.location().clone().with(graph_label.span());
-				match lexer.next().map_loc_err(Error::Lexer)? {
+				match lexer.next().map_err(Error::from_lexer)? {
 					Meta(Some(Token::Dot), _) => (Some(graph_label), loc),
-					Meta(unexpected, loc) => return Err(Loc(Error::Unexpected(unexpected), loc)),
+					Meta(unexpected, loc) => return Err(Box::new(Loc(Error::Unexpected(unexpected), loc))),
 				}
 			}
 		};
@@ -164,11 +172,11 @@ impl<F: Clone> Parse<F>
 		Loc<crate::Term<Location<F>>, F>,
 	>
 {
-	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, BoxedError<L::Error, F>> {
 		let subject = crate::Term::parse(lexer)?;
 		let predicate = crate::Term::parse(lexer)?;
 		let object = crate::Term::parse(lexer)?;
-		let (graph, loc) = match lexer.next().map_loc_err(Error::Lexer)? {
+		let (graph, loc) = match lexer.next().map_err(Error::from_lexer)? {
 			Meta(Some(Token::Dot), _) => (None, subject.location().clone().with(object.span())),
 			opt_token => {
 				let graph_label = match opt_token {
@@ -180,13 +188,13 @@ impl<F: Clone> Parse<F>
 						let Meta(lit, lit_loc) = parse_literal(lexer, string, string_loc)?;
 						Loc(crate::Term::Literal(lit), lit_loc)
 					}
-					Meta(unexpected, loc) => return Err(Loc(Error::Unexpected(unexpected), loc)),
+					Meta(unexpected, loc) => return Err(Box::new(Loc(Error::Unexpected(unexpected), loc))),
 				};
 
 				let loc = subject.location().clone().with(graph_label.span());
-				match lexer.next().map_loc_err(Error::Lexer)? {
+				match lexer.next().map_err(Error::from_lexer)? {
 					Meta(Some(Token::Dot), _) => (Some(graph_label), loc),
-					Meta(unexpected, loc) => return Err(Loc(Error::Unexpected(unexpected), loc)),
+					Meta(unexpected, loc) => return Err(Box::new(Loc(Error::Unexpected(unexpected), loc))),
 				}
 			}
 		};
@@ -196,12 +204,12 @@ impl<F: Clone> Parse<F>
 }
 
 impl<F: Clone> Parse<F> for crate::Document<F> {
-	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, BoxedError<L::Error, F>> {
 		let mut quads = Vec::new();
 		let mut loc: Option<Location<F>> = None;
 
 		let loc = loop {
-			match lexer.peek().map_loc_err(Error::Lexer)? {
+			match lexer.peek().map_err(Error::from_lexer)? {
 				Meta(Some(_), quad_loc) => {
 					quads.push(crate::Quad::parse(lexer)?);
 					loc = match loc {
@@ -223,12 +231,12 @@ impl<F: Clone> Parse<F> for crate::Document<F> {
 }
 
 impl<F: Clone> Parse<F> for crate::GrdfDocument<F> {
-	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, Loc<Error<L::Error>, F>> {
+	fn parse<L: Tokens<F>>(lexer: &mut L) -> Result<Loc<Self, F>, BoxedError<L::Error, F>> {
 		let mut quads = Vec::new();
 		let mut loc: Option<Location<F>> = None;
 
 		let loc = loop {
-			match lexer.peek().map_loc_err(Error::Lexer)? {
+			match lexer.peek().map_err(Error::from_lexer)? {
 				Meta(Some(_), quad_loc) => {
 					quads.push(crate::Quad::parse(lexer)?);
 					loc = match loc {
