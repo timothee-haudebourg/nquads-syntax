@@ -1,20 +1,11 @@
 use nquads_syntax::Parse;
 use std::path::Path;
 
-fn infallible(c: char) -> Result<char, std::convert::Infallible> {
-	Ok(c)
-}
-
 fn parse<P: AsRef<Path>>(path: P) {
 	stderrlog::new().init().ok();
 	match std::fs::read_to_string(&path) {
 		Ok(buffer) => {
-			let mut lexer = nquads_syntax::Lexer::new(
-				(),
-				nquads_syntax::lexing::Utf8Decoded::new(buffer.chars().map(infallible)).peekable(),
-			);
-
-			match nquads_syntax::Document::parse(&mut lexer) {
+			match nquads_syntax::Document::parse_str(&buffer, |span| span) {
 				Ok(_) => (), // success!
 				Err(e) => {
 					log::error!("parse error: {}", e.value());
