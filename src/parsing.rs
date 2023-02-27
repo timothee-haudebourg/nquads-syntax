@@ -1,10 +1,11 @@
 use crate::{
 	lexing::{self, Token, Tokens},
-	Lexer, StringLiteral,
+	Lexer,
 };
 use decoded_char::DecodedChar;
 use iref::IriBuf;
 use locspan::{Meta, Span};
+use rdf_types::Id;
 use std::fmt;
 
 #[derive(Debug)]
@@ -19,7 +20,7 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Self::Unexpected(None) => write!(f, "unexpected end of file"),
-			Self::Unexpected(Some(token)) => write!(f, "unexpected {}", token),
+			Self::Unexpected(Some(token)) => write!(f, "unexpected {token}"),
 			Self::Lexer(e) => e.fmt(f),
 		}
 	}
@@ -79,7 +80,7 @@ impl<L: Tokens, F: FnMut(Span) -> M, M> Parser<L, F> {
 	#[allow(clippy::type_complexity)]
 	fn parse_literal(
 		&mut self,
-		Meta(string, string_span): Meta<StringLiteral, Span>,
+		Meta(string, string_span): Meta<String, Span>,
 	) -> Result<Meta<crate::Literal<M>, M>, MetaError<L::Error, M>> {
 		let mut span = string_span;
 		match self.peek()? {
@@ -286,11 +287,12 @@ impl<M: Clone> Parse<M> for crate::Object<M> {
 	{
 		match parser.next()? {
 			Meta(Some(Token::Iri(iri)), span) => {
-				Ok(Meta(Self::Iri(iri), parser.build_metadata(span)))
+				Ok(Meta(Self::Id(Id::Iri(iri)), parser.build_metadata(span)))
 			}
-			Meta(Some(Token::BlankNodeLabel(label)), span) => {
-				Ok(Meta(Self::Blank(label), parser.build_metadata(span)))
-			}
+			Meta(Some(Token::BlankNodeLabel(label)), span) => Ok(Meta(
+				Self::Id(Id::Blank(label)),
+				parser.build_metadata(span),
+			)),
 			Meta(Some(Token::StringLiteral(string)), string_span) => {
 				let Meta(lit, loc) = parser.parse_literal(Meta(string, string_span))?;
 				Ok(Meta(Self::Literal(lit), loc))
@@ -380,11 +382,12 @@ impl<M: Clone> Parse<M>
 			opt_token => {
 				let graph_label = match opt_token {
 					Meta(Some(Token::Iri(iri)), span) => {
-						Meta(crate::Term::Iri(iri), parser.build_metadata(span))
+						Meta(crate::Term::Id(Id::Iri(iri)), parser.build_metadata(span))
 					}
-					Meta(Some(Token::BlankNodeLabel(label)), span) => {
-						Meta(crate::Term::Blank(label), parser.build_metadata(span))
-					}
+					Meta(Some(Token::BlankNodeLabel(label)), span) => Meta(
+						crate::Term::Id(Id::Blank(label)),
+						parser.build_metadata(span),
+					),
 					Meta(Some(Token::StringLiteral(string)), string_span) => {
 						let Meta(lit, meta) = parser.parse_literal(Meta(string, string_span))?;
 						Meta(crate::Term::Literal(lit), meta)

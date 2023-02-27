@@ -1,4 +1,4 @@
-use super::{BlankIdBuf, StringLiteral};
+use super::BlankIdBuf;
 use decoded_char::DecodedChar;
 use iref::IriBuf;
 use langtag::LanguageTagBuf;
@@ -38,12 +38,12 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			Self::InvalidLangTag => write!(f, "invalid language tag"),
-			Self::InvalidCodepoint(c) => write!(f, "invalid character code point {:x}", c),
+			Self::InvalidCodepoint(c) => write!(f, "invalid character code point {c:x}"),
 			Self::InvalidIriRef(e, iri_ref) => {
-				write!(f, "invalid IRI reference <{}>: {}", iri_ref, e)
+				write!(f, "invalid IRI reference <{iri_ref}>: {e}")
 			}
 			Self::Unexpected(None) => write!(f, "unexpected end of file"),
-			Self::Unexpected(Some(c)) => write!(f, "unexpected character `{}`", c),
+			Self::Unexpected(Some(c)) => write!(f, "unexpected character `{c}`"),
 			Self::Stream(e) => e.fmt(f),
 		}
 	}
@@ -64,7 +64,7 @@ impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
 pub enum Token {
 	LangTag(LanguageTagBuf),
 	Iri(IriBuf),
-	StringLiteral(StringLiteral),
+	StringLiteral(String),
 	BlankNodeLabel(BlankIdBuf),
 	Dot,
 	Carets,
@@ -73,12 +73,12 @@ pub enum Token {
 impl fmt::Display for Token {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			Self::LangTag(tag) => write!(f, "language tag `{}`", tag),
-			Self::Iri(iri) => write!(f, "IRI <{}>", iri),
+			Self::LangTag(tag) => write!(f, "language tag `{tag}`"),
+			Self::Iri(iri) => write!(f, "IRI <{iri}>"),
 			Self::StringLiteral(string) => {
 				write!(f, "string literal \"{}\"", DisplayStringLiteral(string))
 			}
-			Self::BlankNodeLabel(label) => write!(f, "blank node label `{}`", label),
+			Self::BlankNodeLabel(label) => write!(f, "blank node label `{label}`"),
 			Self::Dot => write!(f, "dot `.`"),
 			Self::Carets => write!(f, "carets `^^`"),
 		}
@@ -347,7 +347,7 @@ impl<E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<C, E> {
 	}
 
 	/// Parses a string literal, starting after the first `"` until the closing `"`.
-	fn next_string_literal(&mut self) -> Result<Meta<StringLiteral, Span>, Meta<Error<E>, Span>> {
+	fn next_string_literal(&mut self) -> Result<Meta<String, Span>, Meta<Error<E>, Span>> {
 		let mut string = String::new();
 
 		loop {
@@ -384,7 +384,7 @@ impl<E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<C, E> {
 			}
 		}
 
-		Ok(Meta(string.into(), self.pos.current()))
+		Ok(Meta(string, self.pos.current()))
 	}
 
 	/// Parses a blank node label, starting after the first `_`.
