@@ -3,10 +3,10 @@ use crate::{
 	Lexer,
 };
 use decoded_char::DecodedChar;
-use iref::{IriBuf, Iri};
-use static_iref::iri;
+use iref::{Iri, IriBuf};
 use locspan::{Meta, Span};
 use rdf_types::Id;
+use static_iref::iri;
 use std::fmt;
 
 #[derive(Debug)]
@@ -97,7 +97,10 @@ impl<L: Tokens, F: FnMut(Span) -> M, M> Parser<L, F> {
 				Ok(Meta(
 					crate::Literal::new(
 						Meta(string, self.build_metadata(string_span)),
-						Meta(rdf_types::literal::Type::LangString(tag), self.build_metadata(tag_span)),
+						Meta(
+							rdf_types::literal::Type::LangString(tag),
+							self.build_metadata(tag_span),
+						),
 					),
 					self.build_metadata(span),
 				))
@@ -110,7 +113,10 @@ impl<L: Tokens, F: FnMut(Span) -> M, M> Parser<L, F> {
 						Ok(Meta(
 							crate::Literal::new(
 								Meta(string, self.build_metadata(string_span)),
-								Meta(rdf_types::literal::Type::Any(iri), self.build_metadata(iri_span)),
+								Meta(
+									rdf_types::literal::Type::Any(iri),
+									self.build_metadata(iri_span),
+								),
 							),
 							self.build_metadata(span),
 						))
@@ -124,7 +130,10 @@ impl<L: Tokens, F: FnMut(Span) -> M, M> Parser<L, F> {
 			_ => Ok(Meta(
 				crate::Literal::new(
 					Meta(string, self.build_metadata(string_span)),
-					Meta(rdf_types::literal::Type::Any(XSD_STRING.to_owned()), self.build_metadata(string_span))
+					Meta(
+						rdf_types::literal::Type::Any(XSD_STRING.to_owned()),
+						self.build_metadata(string_span),
+					),
 				),
 				self.build_metadata(span),
 			)),
