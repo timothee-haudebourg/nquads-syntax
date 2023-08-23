@@ -29,7 +29,7 @@ pub trait Tokens {
 pub enum Error<E = std::convert::Infallible> {
 	InvalidLangTag,
 	InvalidCodepoint(u32),
-	InvalidIriRef(iref::Error, String),
+	InvalidIriRef(String),
 	Unexpected(Option<char>),
 	Stream(E),
 }
@@ -39,8 +39,8 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
 		match self {
 			Self::InvalidLangTag => write!(f, "invalid language tag"),
 			Self::InvalidCodepoint(c) => write!(f, "invalid character code point {c:x}"),
-			Self::InvalidIriRef(e, iri_ref) => {
-				write!(f, "invalid IRI reference <{iri_ref}>: {e}")
+			Self::InvalidIriRef(iri_ref) => {
+				write!(f, "invalid IRI reference <{iri_ref}>")
 			}
 			Self::Unexpected(None) => write!(f, "unexpected end of file"),
 			Self::Unexpected(Some(c)) => write!(f, "unexpected character `{c}`"),
@@ -52,7 +52,6 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
 impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
 	fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
 		match self {
-			Self::InvalidIriRef(e, _) => Some(e),
 			Self::Stream(e) => Some(e),
 			_ => None,
 		}
@@ -322,9 +321,9 @@ impl<E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<C, E> {
 			}
 		}
 
-		match IriBuf::from_string(iri) {
+		match IriBuf::new(iri) {
 			Ok(iri) => Ok(Meta(iri, self.pos.current())),
-			Err((e, string)) => Err(Meta(Error::InvalidIriRef(e, string), self.pos.current())),
+			Err(e) => Err(Meta(Error::InvalidIriRef(e.0), self.pos.current())),
 		}
 	}
 

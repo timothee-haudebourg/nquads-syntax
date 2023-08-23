@@ -50,7 +50,7 @@ impl<L, F> Parser<L, F> {
 	}
 }
 
-const XSD_STRING: Iri<'static> = iri!("http://www.w3.org/2001/XMLSchema#string");
+const XSD_STRING: &Iri = iri!("http://www.w3.org/2001/XMLSchema#string");
 
 impl<L: Tokens, F: FnMut(Span) -> M, M> Parser<L, F> {
 	fn next(&mut self) -> Result<Meta<Option<Token>, Span>, MetaError<L::Error, M>> {
