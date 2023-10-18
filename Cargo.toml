@@ -1,6 +1,6 @@
 [package]
 name = "nquads-syntax"
-version = "0.15.0"
+version = "0.16.0"
 edition = "2021"
 authors = ["Timothée Haudebourg <author@haudebourg.net>"]
 description = "RDF 1.1 N-Quads parser with code mapping metadata"
@@ -17,7 +17,7 @@ static-iref = "3.0"
 locspan = "0.7"
 decoded-char = "0.1.1"
 langtag = "0.3"
-rdf-types = { version = "0.16", features = ["meta"] }
+rdf-types = { version = "0.17", features = ["meta"] }
 
 [dev-dependencies]
 codespan-reporting = "0.11.1"
