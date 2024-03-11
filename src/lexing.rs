@@ -1,7 +1,7 @@
 use super::BlankIdBuf;
 use decoded_char::DecodedChar;
 use iref::IriBuf;
-use langtag::LanguageTagBuf;
+use langtag::LangTagBuf;
 use locspan::{ErrAt, Meta, Span};
 use std::{fmt, iter::Peekable};
 
@@ -61,7 +61,7 @@ impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
 /// Token.
 #[derive(Debug)]
 pub enum Token {
-	LangTag(LanguageTagBuf),
+	LangTag(LangTagBuf),
 	Iri(IriBuf),
 	StringLiteral(String),
 	BlankNodeLabel(BlankIdBuf),
@@ -220,7 +220,7 @@ impl<E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<C, E> {
 	}
 
 	/// Parses the rest of a lang tag, after the first `@` character.
-	fn next_langtag(&mut self) -> Result<Meta<LanguageTagBuf, Span>, Meta<Error<E>, Span>> {
+	fn next_langtag(&mut self) -> Result<Meta<LangTagBuf, Span>, Meta<Error<E>, Span>> {
 		let mut tag = String::new();
 
 		loop {
@@ -282,7 +282,7 @@ impl<E, C: Iterator<Item = Result<DecodedChar, E>>> Lexer<C, E> {
 			}
 		}
 
-		match LanguageTagBuf::new(tag.into_bytes()) {
+		match LangTagBuf::new(tag) {
 			Ok(tag) => Ok(Meta(tag, self.pos.current())),
 			Err(_) => Err(Meta(Error::InvalidLangTag, self.pos.current())),
 		}

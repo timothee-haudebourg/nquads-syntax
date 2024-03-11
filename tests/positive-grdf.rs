@@ -5,7 +5,7 @@ fn parse<P: AsRef<Path>>(path: P) {
 	stderrlog::new().init().ok();
 	match std::fs::read_to_string(&path) {
 		Ok(buffer) => {
-			match nquads_syntax::GrdfDocument::parse_str(&buffer, |span| span) {
+			match nquads_syntax::GrdfDocument::parse_str(&buffer) {
 				Ok(_) => (), // success!
 				Err(e) => {
 					log::error!("parse error: {}", e.value());

@@ -5,7 +5,7 @@ use crate::{
 use decoded_char::DecodedChar;
 use iref::{Iri, IriBuf};
 use locspan::{Meta, Span};
-use rdf_types::Id;
+use rdf_types::{Id, Literal, LiteralType};
 use static_iref::iri;
 use std::fmt;
 
@@ -15,7 +15,7 @@ pub enum Error<E> {
 	Unexpected(Option<Token>),
 }
 
-pub type MetaError<E, M> = Meta<Box<Error<E>>, M>;
+pub type MetaError<E, Span> = Meta<Box<Error<E>>, Span>;
 
 impl<E: fmt::Display> fmt::Display for Error<E> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -36,55 +36,47 @@ impl<E: 'static + std::error::Error> std::error::Error for Error<E> {
 	}
 }
 
-pub struct Parser<L, F> {
+pub struct Parser<L> {
 	lexer: L,
-	metadata_builder: F,
 }
 
-impl<L, F> Parser<L, F> {
-	pub fn new(lexer: L, metadata_builder: F) -> Self {
-		Self {
-			lexer,
-			metadata_builder,
-		}
+impl<L> Parser<L> {
+	pub fn new(lexer: L) -> Self {
+		Self { lexer }
 	}
 }
 
 const XSD_STRING: &Iri = iri!("http://www.w3.org/2001/XMLSchema#string");
 
-impl<L: Tokens, F: FnMut(Span) -> M, M> Parser<L, F> {
-	fn next(&mut self) -> Result<Meta<Option<Token>, Span>, MetaError<L::Error, M>> {
+impl<L: Tokens> Parser<L> {
+	fn next(&mut self) -> Result<Meta<Option<Token>, Span>, MetaError<L::Error, Span>> {
 		self.lexer
 			.next()
-			.map_err(|Meta(e, span)| Meta(Box::new(Error::Lexer(e)), (self.metadata_builder)(span)))
+			.map_err(|Meta(e, span)| Meta(Box::new(Error::Lexer(e)), span))
 	}
 
 	#[allow(clippy::type_complexity)]
-	fn peek(&mut self) -> Result<Meta<Option<&Token>, Span>, MetaError<L::Error, M>> {
+	fn peek(&mut self) -> Result<Meta<Option<&Token>, Span>, MetaError<L::Error, Span>> {
 		self.lexer
 			.peek()
-			.map_err(|Meta(e, span)| Meta(Box::new(Error::Lexer(e)), (self.metadata_builder)(span)))
+			.map_err(|Meta(e, span)| Meta(Box::new(Error::Lexer(e)), span))
 	}
 
-	fn begin(&mut self) -> Result<Span, MetaError<L::Error, M>> {
+	fn begin(&mut self) -> Result<Span, MetaError<L::Error, Span>> {
 		self.lexer
 			.begin()
-			.map_err(|Meta(e, span)| Meta(Box::new(Error::Lexer(e)), (self.metadata_builder)(span)))
+			.map_err(|Meta(e, span)| Meta(Box::new(Error::Lexer(e)), span))
 	}
 
 	fn last_span(&self) -> Span {
 		self.lexer.last()
 	}
 
-	fn build_metadata(&mut self, span: Span) -> M {
-		(self.metadata_builder)(span)
-	}
-
 	#[allow(clippy::type_complexity)]
 	fn parse_literal(
 		&mut self,
 		Meta(string, string_span): Meta<String, Span>,
-	) -> Result<Meta<crate::Literal<M>, M>, MetaError<L::Error, M>> {
+	) -> Result<Meta<Literal, Span>, MetaError<L::Error, Span>> {
 		let mut span = string_span;
 		match self.peek()? {
 			Meta(Some(Token::LangTag(_)), tag_span) => {
@@ -95,14 +87,8 @@ impl<L: Tokens, F: FnMut(Span) -> M, M> Parser<L, F> {
 
 				span.append(tag_span);
 				Ok(Meta(
-					crate::Literal::new(
-						Meta(string, self.build_metadata(string_span)),
-						Meta(
-							rdf_types::literal::Type::LangString(tag),
-							self.build_metadata(tag_span),
-						),
-					),
-					self.build_metadata(span),
+					Literal::new(string, LiteralType::LangString(tag)),
+					span,
 				))
 			}
 			Meta(Some(Token::Carets), _) => {
@@ -110,228 +96,148 @@ impl<L: Tokens, F: FnMut(Span) -> M, M> Parser<L, F> {
 				match self.next()? {
 					Meta(Some(Token::Iri(iri)), iri_span) => {
 						span.append(iri_span);
-						Ok(Meta(
-							crate::Literal::new(
-								Meta(string, self.build_metadata(string_span)),
-								Meta(
-									rdf_types::literal::Type::Any(iri),
-									self.build_metadata(iri_span),
-								),
-							),
-							self.build_metadata(span),
-						))
+						Ok(Meta(Literal::new(string, LiteralType::Any(iri)), span))
 					}
-					Meta(unexpected, span) => Err(Meta(
-						Box::new(Error::Unexpected(unexpected)),
-						self.build_metadata(span),
-					)),
+					Meta(unexpected, span) => {
+						Err(Meta(Box::new(Error::Unexpected(unexpected)), span))
+					}
 				}
 			}
 			_ => Ok(Meta(
-				crate::Literal::new(
-					Meta(string, self.build_metadata(string_span)),
-					Meta(
-						rdf_types::literal::Type::Any(XSD_STRING.to_owned()),
-						self.build_metadata(string_span),
-					),
-				),
-				self.build_metadata(span),
+				Literal::new(string, LiteralType::Any(XSD_STRING.to_owned())),
+				span,
 			)),
 		}
 	}
 }
 
-pub trait Parse<M>: Sized {
+pub trait Parse: Sized {
 	#[allow(clippy::type_complexity)]
-	fn parse_with<L, F>(parser: &mut Parser<L, F>) -> Result<Meta<Self, M>, MetaError<L::Error, M>>
+	fn parse_with<L>(parser: &mut Parser<L>) -> Result<Meta<Self, Span>, MetaError<L::Error, Span>>
 	where
-		L: Tokens,
-		F: FnMut(Span) -> M;
+		L: Tokens;
 
 	#[inline(always)]
-	fn parse<C, F, E>(
-		chars: C,
-		metadata_builder: F,
-	) -> Result<Meta<Self, M>, MetaError<lexing::Error<E>, M>>
+	fn parse<C, E>(chars: C) -> Result<Meta<Self, Span>, MetaError<lexing::Error<E>, Span>>
 	where
 		C: Iterator<Item = Result<DecodedChar, E>>,
-		F: FnMut(Span) -> M,
 	{
-		let mut parser = Parser::new(Lexer::new(chars), metadata_builder);
+		let mut parser = Parser::new(Lexer::new(chars));
 		Self::parse_with(&mut parser)
 	}
 
 	#[inline(always)]
-	fn parse_infallible<C, F>(
-		chars: C,
-		metadata_builder: F,
-	) -> Result<Meta<Self, M>, MetaError<lexing::Error, M>>
+	fn parse_infallible<C>(chars: C) -> Result<Meta<Self, Span>, MetaError<lexing::Error, Span>>
 	where
 		C: Iterator<Item = DecodedChar>,
-		F: FnMut(Span) -> M,
 	{
-		Self::parse(chars.map(Ok), metadata_builder)
+		Self::parse(chars.map(Ok))
 	}
 
 	#[inline(always)]
-	fn parse_utf8<C, F, E>(
-		chars: C,
-		metadata_builder: F,
-	) -> Result<Meta<Self, M>, MetaError<lexing::Error<E>, M>>
+	fn parse_utf8<C, E>(chars: C) -> Result<Meta<Self, Span>, MetaError<lexing::Error<E>, Span>>
 	where
 		C: Iterator<Item = Result<char, E>>,
-		F: FnMut(Span) -> M,
 	{
-		Self::parse(
-			decoded_char::FallibleUtf8Decoded::new(chars),
-			metadata_builder,
-		)
+		Self::parse(decoded_char::FallibleUtf8Decoded::new(chars))
 	}
 
 	#[inline(always)]
-	fn parse_utf8_infallible<C, F>(
+	fn parse_utf8_infallible<C>(
 		chars: C,
-		metadata_builder: F,
-	) -> Result<Meta<Self, M>, MetaError<lexing::Error, M>>
+	) -> Result<Meta<Self, Span>, MetaError<lexing::Error, Span>>
 	where
 		C: Iterator<Item = char>,
-		F: FnMut(Span) -> M,
 	{
-		Self::parse_infallible(decoded_char::Utf8Decoded::new(chars), metadata_builder)
+		Self::parse_infallible(decoded_char::Utf8Decoded::new(chars))
 	}
 
 	#[inline(always)]
-	fn parse_utf16<C, F, E>(
-		chars: C,
-		metadata_builder: F,
-	) -> Result<Meta<Self, M>, MetaError<lexing::Error<E>, M>>
+	fn parse_utf16<C, E>(chars: C) -> Result<Meta<Self, Span>, MetaError<lexing::Error<E>, Span>>
 	where
 		C: Iterator<Item = Result<char, E>>,
-		F: FnMut(Span) -> M,
 	{
-		Self::parse(
-			decoded_char::FallibleUtf16Decoded::new(chars),
-			metadata_builder,
-		)
+		Self::parse(decoded_char::FallibleUtf16Decoded::new(chars))
 	}
 
 	#[inline(always)]
-	fn parse_utf16_infallible<C, F>(
+	fn parse_utf16_infallible<C>(
 		chars: C,
-		metadata_builder: F,
-	) -> Result<Meta<Self, M>, MetaError<lexing::Error, M>>
+	) -> Result<Meta<Self, Span>, MetaError<lexing::Error, Span>>
 	where
 		C: Iterator<Item = char>,
-		F: FnMut(Span) -> M,
 	{
-		Self::parse_infallible(decoded_char::Utf16Decoded::new(chars), metadata_builder)
+		Self::parse_infallible(decoded_char::Utf16Decoded::new(chars))
 	}
 
 	#[inline(always)]
-	fn parse_str<F>(
-		string: &str,
-		metadata_builder: F,
-	) -> Result<Meta<Self, M>, MetaError<lexing::Error, M>>
-	where
-		F: FnMut(Span) -> M,
-	{
-		Self::parse_utf8_infallible(string.chars(), metadata_builder)
+	fn parse_str(string: &str) -> Result<Meta<Self, Span>, MetaError<lexing::Error, Span>> {
+		Self::parse_utf8_infallible(string.chars())
 	}
 }
 
-impl<M: Clone> Parse<M> for IriBuf {
-	fn parse_with<L, F>(parser: &mut Parser<L, F>) -> Result<Meta<Self, M>, MetaError<L::Error, M>>
+impl Parse for IriBuf {
+	fn parse_with<L>(parser: &mut Parser<L>) -> Result<Meta<Self, Span>, MetaError<L::Error, Span>>
 	where
 		L: Tokens,
-		F: FnMut(Span) -> M,
 	{
 		match parser.next()? {
-			Meta(Some(Token::Iri(iri)), span) => Ok(Meta(iri, parser.build_metadata(span))),
-			Meta(unexpected, span) => Err(Meta(
-				Box::new(Error::Unexpected(unexpected)),
-				parser.build_metadata(span),
-			)),
+			Meta(Some(Token::Iri(iri)), span) => Ok(Meta(iri, span)),
+			Meta(unexpected, span) => Err(Meta(Box::new(Error::Unexpected(unexpected)), span)),
 		}
 	}
 }
 
-impl<M: Clone> Parse<M> for crate::Subject {
-	fn parse_with<L, F>(parser: &mut Parser<L, F>) -> Result<Meta<Self, M>, MetaError<L::Error, M>>
+impl Parse for crate::Subject {
+	fn parse_with<L>(parser: &mut Parser<L>) -> Result<Meta<Self, Span>, MetaError<L::Error, Span>>
 	where
 		L: Tokens,
-		F: FnMut(Span) -> M,
 	{
 		match parser.next()? {
-			Meta(Some(Token::Iri(iri)), span) => {
-				Ok(Meta(Self::Iri(iri), parser.build_metadata(span)))
-			}
-			Meta(Some(Token::BlankNodeLabel(label)), span) => {
-				Ok(Meta(Self::Blank(label), parser.build_metadata(span)))
-			}
-			Meta(unexpected, span) => Err(Meta(
-				Box::new(Error::Unexpected(unexpected)),
-				parser.build_metadata(span),
-			)),
+			Meta(Some(Token::Iri(iri)), span) => Ok(Meta(Self::Iri(iri), span)),
+			Meta(Some(Token::BlankNodeLabel(label)), span) => Ok(Meta(Self::Blank(label), span)),
+			Meta(unexpected, span) => Err(Meta(Box::new(Error::Unexpected(unexpected)), span)),
 		}
 	}
 }
 
-impl<M: Clone> Parse<M> for crate::Literal<M> {
-	fn parse_with<L, F>(parser: &mut Parser<L, F>) -> Result<Meta<Self, M>, MetaError<L::Error, M>>
+impl Parse for Literal {
+	fn parse_with<L>(parser: &mut Parser<L>) -> Result<Meta<Self, Span>, MetaError<L::Error, Span>>
 	where
 		L: Tokens,
-		F: FnMut(Span) -> M,
 	{
 		match parser.next()? {
 			Meta(Some(Token::StringLiteral(string)), span) => {
 				parser.parse_literal(Meta(string, span))
 			}
-			Meta(unexpected, span) => Err(Meta(
-				Box::new(Error::Unexpected(unexpected)),
-				parser.build_metadata(span),
-			)),
+			Meta(unexpected, span) => Err(Meta(Box::new(Error::Unexpected(unexpected)), span)),
 		}
 	}
 }
 
-impl<M: Clone> Parse<M> for crate::Object<M> {
-	fn parse_with<L, F>(parser: &mut Parser<L, F>) -> Result<Meta<Self, M>, MetaError<L::Error, M>>
+impl Parse for crate::Object {
+	fn parse_with<L>(parser: &mut Parser<L>) -> Result<Meta<Self, Span>, MetaError<L::Error, Span>>
 	where
 		L: Tokens,
-		F: FnMut(Span) -> M,
 	{
 		match parser.next()? {
-			Meta(Some(Token::Iri(iri)), span) => {
-				Ok(Meta(Self::Id(Id::Iri(iri)), parser.build_metadata(span)))
+			Meta(Some(Token::Iri(iri)), span) => Ok(Meta(Self::Id(Id::Iri(iri)), span)),
+			Meta(Some(Token::BlankNodeLabel(label)), span) => {
+				Ok(Meta(Self::Id(Id::Blank(label)), span))
 			}
-			Meta(Some(Token::BlankNodeLabel(label)), span) => Ok(Meta(
-				Self::Id(Id::Blank(label)),
-				parser.build_metadata(span),
-			)),
 			Meta(Some(Token::StringLiteral(string)), string_span) => {
 				let Meta(lit, loc) = parser.parse_literal(Meta(string, string_span))?;
 				Ok(Meta(Self::Literal(lit), loc))
 			}
-			Meta(unexpected, span) => Err(Meta(
-				Box::new(Error::Unexpected(unexpected)),
-				parser.build_metadata(span),
-			)),
+			Meta(unexpected, span) => Err(Meta(Box::new(Error::Unexpected(unexpected)), span)),
 		}
 	}
 }
 
-impl<M: Clone> Parse<M>
-	for crate::Quad<
-		Meta<crate::Subject, M>,
-		Meta<crate::IriBuf, M>,
-		Meta<crate::Object<M>, M>,
-		Meta<crate::GraphLabel, M>,
-	>
-{
-	fn parse_with<L, F>(parser: &mut Parser<L, F>) -> Result<Meta<Self, M>, MetaError<L::Error, M>>
+impl Parse for crate::Quad {
+	fn parse_with<L>(parser: &mut Parser<L>) -> Result<Meta<Self, Span>, MetaError<L::Error, Span>>
 	where
 		L: Tokens,
-		F: FnMut(Span) -> M,
 	{
 		let mut span = parser.begin()?;
 		let subject = crate::Subject::parse_with(parser)?;
@@ -341,27 +247,19 @@ impl<M: Clone> Parse<M>
 			Meta(Some(Token::Dot), _) => None,
 			opt_token => {
 				let graph_label = match opt_token {
-					Meta(Some(Token::Iri(iri)), span) => {
-						Meta(crate::GraphLabel::Iri(iri), parser.build_metadata(span))
-					}
+					Meta(Some(Token::Iri(iri)), span) => Meta(crate::GraphLabel::Iri(iri), span),
 					Meta(Some(Token::BlankNodeLabel(label)), span) => {
-						Meta(crate::GraphLabel::Blank(label), parser.build_metadata(span))
+						Meta(crate::GraphLabel::Blank(label), span)
 					}
 					Meta(unexpected, span) => {
-						return Err(Meta(
-							Box::new(Error::Unexpected(unexpected)),
-							parser.build_metadata(span),
-						))
+						return Err(Meta(Box::new(Error::Unexpected(unexpected)), span))
 					}
 				};
 
 				match parser.next()? {
 					Meta(Some(Token::Dot), _) => Some(graph_label),
 					Meta(unexpected, span) => {
-						return Err(Meta(
-							Box::new(Error::Unexpected(unexpected)),
-							parser.build_metadata(span),
-						))
+						return Err(Meta(Box::new(Error::Unexpected(unexpected)), span))
 					}
 				}
 			}
@@ -369,24 +267,16 @@ impl<M: Clone> Parse<M>
 
 		span.append(parser.last_span());
 		Ok(Meta(
-			crate::Quad(subject, predicate, object, graph),
-			parser.build_metadata(span),
+			crate::Quad::new(subject, predicate, object, graph),
+			span,
 		))
 	}
 }
 
-impl<M: Clone> Parse<M>
-	for crate::Quad<
-		Meta<crate::Term<M>, M>,
-		Meta<crate::Term<M>, M>,
-		Meta<crate::Term<M>, M>,
-		Meta<crate::Term<M>, M>,
-	>
-{
-	fn parse_with<L, F>(parser: &mut Parser<L, F>) -> Result<Meta<Self, M>, MetaError<L::Error, M>>
+impl Parse for crate::GrdfQuad {
+	fn parse_with<L>(parser: &mut Parser<L>) -> Result<Meta<Self, Span>, MetaError<L::Error, Span>>
 	where
 		L: Tokens,
-		F: FnMut(Span) -> M,
 	{
 		let mut span = parser.begin()?;
 		let subject = crate::Term::parse_with(parser)?;
@@ -396,32 +286,23 @@ impl<M: Clone> Parse<M>
 			Meta(Some(Token::Dot), _) => None,
 			opt_token => {
 				let graph_label = match opt_token {
-					Meta(Some(Token::Iri(iri)), span) => {
-						Meta(crate::Term::Id(Id::Iri(iri)), parser.build_metadata(span))
+					Meta(Some(Token::Iri(iri)), span) => Meta(crate::Term::Id(Id::Iri(iri)), span),
+					Meta(Some(Token::BlankNodeLabel(label)), span) => {
+						Meta(crate::Term::Id(Id::Blank(label)), span)
 					}
-					Meta(Some(Token::BlankNodeLabel(label)), span) => Meta(
-						crate::Term::Id(Id::Blank(label)),
-						parser.build_metadata(span),
-					),
 					Meta(Some(Token::StringLiteral(string)), string_span) => {
 						let Meta(lit, meta) = parser.parse_literal(Meta(string, string_span))?;
 						Meta(crate::Term::Literal(lit), meta)
 					}
 					Meta(unexpected, span) => {
-						return Err(Meta(
-							Box::new(Error::Unexpected(unexpected)),
-							parser.build_metadata(span),
-						))
+						return Err(Meta(Box::new(Error::Unexpected(unexpected)), span))
 					}
 				};
 
 				match parser.next()? {
 					Meta(Some(Token::Dot), _) => Some(graph_label),
 					Meta(unexpected, span) => {
-						return Err(Meta(
-							Box::new(Error::Unexpected(unexpected)),
-							parser.build_metadata(span),
-						))
+						return Err(Meta(Box::new(Error::Unexpected(unexpected)), span))
 					}
 				}
 			}
@@ -429,17 +310,16 @@ impl<M: Clone> Parse<M>
 
 		span.append(parser.last_span());
 		Ok(Meta(
-			crate::Quad(subject, predicate, object, graph),
-			parser.build_metadata(span),
+			crate::GrdfQuad::new(subject, predicate, object, graph),
+			span,
 		))
 	}
 }
 
-impl<M: Clone> Parse<M> for crate::Document<M> {
-	fn parse_with<L, F>(parser: &mut Parser<L, F>) -> Result<Meta<Self, M>, MetaError<L::Error, M>>
+impl Parse for crate::Document {
+	fn parse_with<L>(parser: &mut Parser<L>) -> Result<Meta<Self, Span>, MetaError<L::Error, Span>>
 	where
 		L: Tokens,
-		F: FnMut(Span) -> M,
 	{
 		let mut quads = Vec::new();
 		let mut span = parser.begin()?;
@@ -456,15 +336,14 @@ impl<M: Clone> Parse<M> for crate::Document<M> {
 			}
 		}
 
-		Ok(Meta(quads, parser.build_metadata(span)))
+		Ok(Meta(quads, span))
 	}
 }
 
-impl<M: Clone> Parse<M> for crate::GrdfDocument<M> {
-	fn parse_with<L, F>(parser: &mut Parser<L, F>) -> Result<Meta<Self, M>, MetaError<L::Error, M>>
+impl Parse for crate::GrdfDocument {
+	fn parse_with<L>(parser: &mut Parser<L>) -> Result<Meta<Self, Span>, MetaError<L::Error, Span>>
 	where
 		L: Tokens,
-		F: FnMut(Span) -> M,
 	{
 		let mut quads = Vec::new();
 		let mut span = parser.begin()?;
@@ -472,7 +351,7 @@ impl<M: Clone> Parse<M> for crate::GrdfDocument<M> {
 		loop {
 			match parser.peek()? {
 				Meta(Some(_), _) => {
-					quads.push(crate::Quad::parse_with(parser)?);
+					quads.push(crate::GrdfQuad::parse_with(parser)?);
 				}
 				Meta(None, end) => {
 					span.append(end);
@@ -481,6 +360,6 @@ impl<M: Clone> Parse<M> for crate::GrdfDocument<M> {
 			}
 		}
 
-		Ok(Meta(quads, parser.build_metadata(span)))
+		Ok(Meta(quads, span))
 	}
 }
