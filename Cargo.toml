@@ -1,6 +1,6 @@
 [package]
 name = "nquads-syntax"
-version = "0.18.0"
+version = "0.19.0"
 edition = "2021"
 authors = ["Timothée Haudebourg <author@haudebourg.net>"]
 description = "RDF 1.1 N-Quads parser with code mapping metadata"
