@@ -23,3 +23,13 @@ pub type Document = Vec<Meta<Quad, Span>>;
 
 /// gRDF N-Quads document.
 pub type GrdfDocument = Vec<Meta<GrdfQuad, Span>>;
+
+/// Strips all the metadata from the given quad.
+#[allow(clippy::type_complexity)]
+pub fn strip_quad<S, P, O, G, M>(
+	quad: rdf_types::Quad<Meta<S, M>, Meta<P, M>, Meta<O, M>, Meta<G, M>>,
+) -> rdf_types::Quad<S, P, O, G> {
+	quad.map_all(Meta::into_value, Meta::into_value, Meta::into_value, |g| {
+		g.map(Meta::into_value)
+	})
+}
