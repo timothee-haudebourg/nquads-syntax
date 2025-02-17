@@ -8,14 +8,14 @@ fn parse<P: AsRef<Path>>(path: P) {
 			match nquads_syntax::Document::parse_str(&buffer) {
 				Ok(_) => (), // success!
 				Err(e) => {
-					log::error!("parse error: {}", e.value());
-					panic!("parse error: {:?}", e)
+					log::error!("parse error: {e}");
+					panic!("parse error: {e:?}")
 				}
 			}
 		}
 		Err(e) => {
 			log::error!("unable to read file `{}`: {}", path.as_ref().display(), e);
-			panic!("IO error: {:?}", e)
+			panic!("IO error: {e:?}")
 		}
 	}
 }
